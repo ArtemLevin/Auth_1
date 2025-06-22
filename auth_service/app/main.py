@@ -8,6 +8,8 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_ipaddr
 
+from auth_service.app.db.session import db_helper
+from auth_service.app.models import Base
 from auth_service.app.api.v1.routes import auth, roles
 from auth_service.app.settings import settings
 from auth_service.app.utils.cache import redis_client, test_connection
@@ -34,13 +36,19 @@ limiter = Limiter(
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("Приложение запускается...")
+    logger.info("Создание моделей базы данных...")
+    async with db_helper.engine.begin() as conn: 
+        await conn.run_sync(Base.metadata.create_all)
+
     await test_connection()
     yield
     logger.info("Приложение завершает работу...")
+    await db_helper.dispose()
     await redis_client.close()
 
 app = FastAPI(
     title=settings.APP_NAME,
+    description=settings.APP_DESCRIPTION,
     debug=settings.DEBUG,
     version="0.1.0",
     docs_url=f"{settings.API_V1_STR}/docs",

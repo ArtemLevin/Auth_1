@@ -2,7 +2,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth_service.app.db.session import get_db_session
+from auth_service.app.db.session import db_helper
 from auth_service.app.schemas import LoginRequest, TokenPair
 from auth_service.app.services.auth_service import AuthService
 
@@ -11,7 +11,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-async def get_auth_service(db: AsyncSession = Depends(get_db_session)) -> AuthService:
+async def get_auth_service(db: AsyncSession = Depends(db_helper.get_db_session)) -> AuthService:
     return AuthService(db)
 
 
