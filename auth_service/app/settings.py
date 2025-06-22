@@ -1,22 +1,32 @@
-import os
-from typing import List, Literal, Optional
+from typing import List, Literal
+from pathlib import Path
 
-from dotenv import load_dotenv
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings
-
-DOTENV_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
-load_dotenv(DOTENV_PATH)
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+
+class ConfigBase(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_DIR / ".env", case_sensitive=False, env_file_encoding="utf-8", extra="ignore"
+    )
+    
+
+class Settings(ConfigBase):
     ENVIRONMENT: Literal["development", "test", "staging", "production"] = "development"
 
-    APP_NAME: str = "Auth Service"
+    APP_NAME: str = Field("")
+    APP_DESCRIPTION: str = Field("")
     DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
 
-    DATABASE_URL: str = Field(..., description="PostgreSQL async URL")
+    POSTGRES_USER: SecretStr = Field(..., description="PostgreSQL username for database authentication")
+    POSTGRES_PASSWORD: SecretStr = Field(..., description="PostgreSQL password for the specified user")
+    POSTGRES_DB: SecretStr = Field(..., description="Name of the PostgreSQL database to connect to")
+    POSTGRES_PORT: int = Field(..., description="Port number PostgreSQL is running on")
+    POSTGRES_HOST: SecretStr = Field(..., description="Hostname or IP address where PostgreSQL is hosted")
+
     DATABASE_POOL_SIZE: int = 5
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_ECHO: bool = False
@@ -47,13 +57,13 @@ class Settings(BaseSettings):
 
     MFA_TOTP_ISSUER: str = "OnlineCinema Auth"
 
-    @field_validator("DATABASE_URL", mode="after")
-    def check_database_url(cls, v):
-        if not v.startswith(("postgresql+asyncpg://", "sqlite+aiosqlite://")):
-            raise ValueError(
-                "DATABASE_URL должен начинаться с postgresql+asyncpg:// или sqlite+aiosqlite://"
-            )
-        return v
+    # @field_validator("DATABASE_URL", mode="after")
+    # def check_database_url(cls, v):
+    #     if not v.startswith(("postgresql+asyncpg://", "sqlite+aiosqlite://")):
+    #         raise ValueError(
+    #             "DATABASE_URL должен начинаться с postgresql+asyncpg:// или sqlite+aiosqlite://"
+    #         )
+    #     return v
 
     @field_validator("JWT_SECRET_KEY", "JWT_REFRESH_SECRET_KEY", mode="after")
     def check_jwt_secrets(cls, v: SecretStr, info):
@@ -75,3 +85,4 @@ settings = Settings()
 
 if __name__ == "__main__":
     print(settings.model_dump(exclude={"JWT_SECRET_KEY", "JWT_REFRESH_SECRET_KEY"}))
+    print(PROJECT_DIR)
