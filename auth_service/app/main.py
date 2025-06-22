@@ -11,9 +11,11 @@ from slowapi.util import get_ipaddr
 from auth_service.app.db.session import db_helper
 from auth_service.app.models import Base
 from auth_service.app.api.v1.routes import auth, roles
+from auth_service.app.models.base import create_database
 from auth_service.app.settings import settings
 from auth_service.app.utils.cache import redis_client, test_connection
 from auth_service.app.core.logging_config import setup_logging
+from auth_service.app.schemas.error import ErrorResponseModel
 
 logger = structlog.get_logger(__name__)
 
@@ -41,6 +43,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     await test_connection()
+    await create_database()
     yield
     logger.info("Приложение завершает работу...")
     await db_helper.dispose()
@@ -63,13 +66,10 @@ app.state.limiter = limiter
 
 # Обработчик исключений для RateLimitExceeded
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
-    """
-    Обработчик исключений для превышения лимита запросов.
-    Возвращает JSON-ответ со статусом 429 Too Many Requests.
-    """
     logger.warning("Превышен лимит запросов", ip_address=request.client.host, detail=exc.detail)
+    error_detail = {"rate_limit": f"Rate limit exceeded: {exc.detail}"}
     return JSONResponse(
-        {"detail": f"Rate limit exceeded: {exc.detail}"},
+        content=ErrorResponseModel(detail=error_detail).model_dump(),
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
     )
 

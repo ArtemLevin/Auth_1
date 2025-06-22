@@ -17,3 +17,16 @@ class ErrorResponse(BaseModel):
 class SuccessResponse(BaseModel):
     data: dict
     meta: Dict = {"status": "success"}
+
+
+class ErrorResponseModel(BaseModel):
+    detail: dict[str, str]
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "detail": {
+                    "login": "User with login 'testuser' already exists."
+                }
+            }
+        }

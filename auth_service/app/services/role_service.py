@@ -1,15 +1,16 @@
-from typing import List, Optional
-from uuid import UUID as PyUUID
+from typing import List
+from uuid import UUID
 
 import structlog
-from sqlalchemy import delete, insert, update
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from auth_service.app.models.role import Role
 from auth_service.app.models.user import User
 from auth_service.app.models.user_role import UserRole
-from auth_service.app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
+from auth_service.app.schemas.role import RoleCreate, RoleUpdate
+from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 
@@ -40,15 +41,10 @@ class RoleService:
         result = await self.db_session.execute(select(Role))
         roles = result.scalars().all()
         logger.debug("Получен список всех ролей", count=len(roles))
-        return roles
+        return list(roles)
 
-    async def get_role_by_id(self, role_id: str) -> Optional[Role]:
-        try:
-            role_uuid = PyUUID(role_id)
-        except ValueError:
-            logger.warning("Неверный формат UUID для role_id", role_id=role_id)
-            return None
-        role = await self.db_session.get(Role, role_uuid)
+    async def get_role_by_id(self, role_id: UUID) -> Role | None:
+        role = await self.db_session.get(Role, role_id)
         if role:
             logger.debug("Роль найдена по ID", role_id=role_id)
         else:
@@ -56,17 +52,9 @@ class RoleService:
         return role
 
     async def update_role(
-        self, role_id: str, role_update: RoleUpdate
-    ) -> Optional[Role]:
-        try:
-            role_uuid = PyUUID(role_id)
-        except ValueError:
-            logger.warning(
-                "Неверный формат UUID для role_id при обновлении", role_id=role_id
-            )
-            return None
-
-        role = await self.db_session.get(Role, role_uuid)
+        self, role_id: UUID, role_update: RoleUpdate
+    ) -> Role | None:
+        role = await self.db_session.get(Role, role_id)
         if not role:
             logger.warning("Роль не найдена для обновления", role_id=role_id)
             return None
@@ -96,16 +84,8 @@ class RoleService:
         )
         return role
 
-    async def delete_role(self, role_id: str) -> bool:
-        try:
-            role_uuid = PyUUID(role_id)
-        except ValueError:
-            logger.warning(
-                "Неверный формат UUID для role_id при удалении", role_id=role_id
-            )
-            return False
-
-        result = await self.db_session.execute(delete(Role).where(Role.id == role_uuid))
+    async def delete_role(self, role_id: UUID) -> bool:
+        result = await self.db_session.execute(delete(Role).where(Role.id == role_id))
         await self.db_session.commit()
         if result.rowcount > 0:
             logger.info("Роль успешно удалена", role_id=role_id)
@@ -114,20 +94,9 @@ class RoleService:
             logger.warning("Роль не найдена для удаления", role_id=role_id)
             return False
 
-    async def assign_role_to_user(self, user_id: str, role_id: str) -> bool:
-        try:
-            user_uuid = PyUUID(user_id)
-            role_uuid = PyUUID(role_id)
-        except ValueError:
-            logger.warning(
-                "Неверный формат UUID для user_id или role_id при назначении",
-                user_id=user_id,
-                role_id=role_id,
-            )
-            return False
-
-        user_exists = await self.db_session.get(User, user_uuid)
-        role_exists = await self.db_session.get(Role, role_uuid)
+    async def assign_role_to_user(self, user_id: UUID, role_id: UUID) -> bool:
+        user_exists = await self.db_session.get(User, user_id)
+        role_exists = await self.db_session.get(Role, role_id)
         if not user_exists or not role_exists:
             logger.warning(
                 "Пользователь или роль не найдены для назначения",
@@ -138,7 +107,7 @@ class RoleService:
 
         existing_assignment = await self.db_session.execute(
             select(UserRole).where(
-                UserRole.user_id == user_uuid, UserRole.role_id == role_uuid
+                UserRole.user_id == user_id, UserRole.role_id == role_id
             )
         )
         if existing_assignment.scalar_one_or_none():
@@ -149,33 +118,24 @@ class RoleService:
             )
             return False
 
-        user_role = UserRole(user_id=user_uuid, role_id=role_uuid)
+        user_role = UserRole(user_id=user_id, role_id=role_id)
         self.db_session.add(user_role)
         await self.db_session.commit()
+        await redis_client.delete(f"permissions:{user_id}")
         logger.info(
             "Роль успешно назначена пользователю", user_id=user_id, role_id=role_id
         )
         return True
 
-    async def revoke_role_from_user(self, user_id: str, role_id: str) -> bool:
-        try:
-            user_uuid = PyUUID(user_id)
-            role_uuid = PyUUID(role_id)
-        except ValueError:
-            logger.warning(
-                "Неверный формат UUID для user_id или role_id при отзыве",
-                user_id=user_id,
-                role_id=role_id,
-            )
-            return False
-
+    async def revoke_role_from_user(self, user_id: UUID, role_id: UUID) -> bool:
         result = await self.db_session.execute(
             delete(UserRole).where(
-                UserRole.user_id == user_uuid, UserRole.role_id == role_uuid
+                UserRole.user_id == user_id, UserRole.role_id == role_id
             )
         )
         await self.db_session.commit()
         if result.rowcount > 0:
+            await redis_client.delete(f"permissions:{user_id}")
             logger.info(
                 "Роль успешно отозвана у пользователя", user_id=user_id, role_id=role_id
             )
@@ -188,20 +148,11 @@ class RoleService:
             )
             return False
 
-    async def get_user_permissions(self, user_id: str) -> List[str]:
-        try:
-            user_uuid = PyUUID(user_id)
-        except ValueError:
-            logger.warning(
-                "Неверный формат UUID для user_id при получении разрешений",
-                user_id=user_id,
-            )
-            return []
-
+    async def get_user_permissions(self, user_id: UUID) -> List[str]:
         result = await self.db_session.execute(
             select(Role.permissions)
             .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_uuid)
+            .where(UserRole.user_id == user_id)
         )
         all_permissions = set()
         for row in result.scalars().all():

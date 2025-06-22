@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from auth_service.app.core.security import decode_jwt
 from auth_service.app.db.session import db_helper
 from auth_service.app.models import Role, User, UserRole
+from auth_service.app.schemas.error import ErrorResponseModel
 from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
@@ -133,8 +134,11 @@ async def get_current_user(
         )
     except ValueError as e:
         logger.warning("Ошибка валидации токена", error=str(e))
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ErrorResponseModel(detail={"token": "Token is blacklisted"}).model_dump(),
+        )
+    except Exception as e:
         logger.exception(
             "Произошла непредвиденная ошибка при получении текущего пользователя"
         )

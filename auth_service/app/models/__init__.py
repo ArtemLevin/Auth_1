@@ -4,4 +4,4 @@ from .role import Role
 from .user import User
 from .user_role import UserRole
 
-__all__ = ["Base", "LoginHistory", "Role", "User", "UserRole"]
+__all__ = ["Base", "User", "Role", "UserRole", "LoginHistory"]

@@ -1,6 +1,6 @@
 from .auth import LoginRequest, RegisterRequest, TokenData, TokenPair
 from .mfa import MFASetupResponse, MFAVerifyRequest, MFAVerifyResponse
-from .permission import PermissionCheckRequest, PermissionCheckResponse
+from .permission import PermissionCheckRequest, PermissionCheckResponse, UserPermissionsResponse
 from .role import RoleBase, RoleCreate, RoleResponse, RoleUpdate
 from .user import UpdateProfileRequest, UserBase, UserCreate, UserResponse
 
@@ -21,4 +21,5 @@ __all__ = [
     "MFAVerifyResponse",
     "PermissionCheckRequest",
     "PermissionCheckResponse",
+    "UserPermissionsResponse",
 ]

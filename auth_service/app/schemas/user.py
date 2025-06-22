@@ -1,13 +1,13 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import List, Optional, Annotated
+from typing import Annotated
 from annotated_types import MaxLen, MinLen
 from uuid import UUID
 
 
 class UserBase(BaseModel):
     login: Annotated[str, MaxLen(50)]
-    email: Optional[Annotated[str, MaxLen(100)]] = None
+    email: Annotated[str, MaxLen(100)] | None = None
 
 
 class UserCreate(UserBase):
@@ -15,9 +15,9 @@ class UserCreate(UserBase):
 
 
 class UpdateProfileRequest(BaseModel):
-    login: Optional[Annotated[str, MaxLen(50)]] = None
-    password: Optional[Annotated[str, MinLen(6)]] = None
-    email: Optional[Annotated[str, MaxLen(100)]] = None
+    login: Annotated[str, MaxLen(50)] | None = None
+    password: Annotated[str, MinLen(6)] | None = None
+    email: Annotated[str, MaxLen(100)] | None= None
 
 
 class UserResponse(UserBase):

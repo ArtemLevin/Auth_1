@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Optional
 
 from annotated_types import MaxLen, MinLen
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class TokenData(BaseModel):
@@ -23,4 +23,5 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     login: Annotated[str, MinLen(3), MaxLen(50)]
     password: Annotated[str, MinLen(6)]
-    email: Optional[Annotated[str, MaxLen(100)]] = None
+    email: Optional[Annotated[EmailStr, MaxLen(100)]] = None
+

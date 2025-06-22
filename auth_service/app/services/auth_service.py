@@ -38,27 +38,46 @@ class AuthService:
 
     async def register(
         self, login: str, password: str, email: str | None = None
-    ) -> User:
+    ) -> tuple[bool, dict[str, str]]:
+        success = True
+        errors: dict[str, str] = {}
+
         existing_user = await self.db_session.execute(
             select(User).where(User.login == login)
         )
+
         if existing_user.scalar_one_or_none():
+            success = False
             logger.warning(
                 "Попытка регистрации с уже существующим логином", login=login
             )
-            raise ValueError(f"User with login '{login}' already exists.")
+            errors["login"] = f"User with login '{login}' already exists."
 
-        hashed_password = get_password_hash(password)
-        user = User(login=login, password_hash=hashed_password, email=email)
-        self.db_session.add(user)
-        await self.db_session.commit()
-        await self.db_session.refresh(user)
-        logger.info(
-            "Новый пользователь успешно зарегистрирован",
-            user_id=user.id,
-            login=user.login,
-        )
-        return user
+        if email:
+            user_with_same_email = await self.db_session.execute(
+                select(User).where(User.email == email)
+            )
+            if user_with_same_email.scalar_one_or_none():
+                success = False
+                logger.warning(
+                    "Попытка регистрации с уже существующим адресом электронной почты",
+                    email=email
+                )
+                errors["email"] = f"User with email '{email}' already exists."
+
+        if success:
+            hashed_password = get_password_hash(password)
+            user = User(login=login, password_hash=hashed_password, email=email)
+            self.db_session.add(user)
+            await self.db_session.commit()
+            await self.db_session.refresh(user)
+            logger.info(
+                "Новый пользователь успешно зарегистрирован",
+                user_id=user.id,
+                login=user.login,
+            )
+
+        return success, errors
 
     async def update_profile(
         self,
@@ -111,7 +130,7 @@ class AuthService:
         )  # Заглушка, пока не реализована модель LoginHistory и ее использование
 
     async def logout(self, jti: str, token_ttl: int):
-        await add_to_blacklist(jti, token_ttl)
+        # await add_to_blacklist(jti, token_ttl)
         logger.info("Пользователь вышел из системы", jti=jti)
 
     async def logout_all_other_sessions(
