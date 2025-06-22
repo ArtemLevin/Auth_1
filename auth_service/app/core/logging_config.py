@@ -1,21 +1,24 @@
 import logging
+
 import structlog
 from colorlog import ColoredFormatter
+
 from auth_service.app.settings import settings
 
-def setup_logging():
+
+def setup_logging() -> None:
     if not settings.LOG_JSON_FORMAT:
         formatter = ColoredFormatter(
             "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(name)-25s%(reset)s %(white)s%(message)s",
             log_colors={
-                'DEBUG': 'cyan',
-                'INFO': 'green',
-                'WARNING': 'yellow',
-                'ERROR': 'red',
-                'CRITICAL': 'red,bg_white',
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
             },
             secondary_log_colors={},
-            style='%'
+            style="%"
         )
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
@@ -53,7 +56,8 @@ def setup_logging():
 
     structlog.stdlib.ProcessorFormatter.wrap_for_formatter(
         logging.getLogger().handlers[0].formatter,
-        processors=processors,
+        name="logger",
+        event_dict={}
     )
 
     logging.getLogger().setLevel(settings.LOG_LEVEL)

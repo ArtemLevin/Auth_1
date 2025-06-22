@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Union
+from typing import Any, Union
 from uuid import UUID, uuid4
 
 import structlog
 from jose import jwt
+from jose.exceptions import ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Mapped
-from jose.exceptions import ExpiredSignatureError, JWTError
 
 from auth_service.app.settings import settings
 from auth_service.app.utils.cache import redis_client
@@ -29,10 +29,10 @@ def generate_jti() -> str:
 
 
 def create_access_token(
-        subject: UUID,
-        payload: Dict[str, Any] | None = None,
-        expires_minutes: int | None = None,
-        mfa_verified: bool = False,
+    subject: UUID,
+    payload: dict[str, Any] | None = None,
+    expires_minutes: int | None = None,
+    mfa_verified: bool = False,
 ) -> str:
     to_encode = payload.copy() if payload else {}
     expire = datetime.now(timezone.utc) + timedelta(
@@ -52,9 +52,9 @@ def create_access_token(
 
 
 def create_refresh_token(
-        subject: Union[UUID, Mapped[UUID]],
-        payload: Dict[str, Any] | None = None,
-        expires_days: int | None = None,
+    subject: Union[UUID, Mapped[UUID]],
+    payload: dict[str, Any] | None = None,
+    expires_days: int | None = None,
 ) -> str:
     to_encode = payload.copy() if payload else {}
     expire = datetime.now(timezone.utc) + timedelta(
@@ -76,14 +76,14 @@ async def is_token_blacklisted(jti: str) -> bool:
     return blacklisted is not None
 
 
-async def add_to_blacklist(jti: str, ttl_seconds: int):
+async def add_to_blacklist(jti: str, ttl_seconds: int) -> None:
     await redis_client.setex(f"blacklist:{jti}", ttl_seconds, "1")
     logger.info("Токен добавлен в черный список", jti=jti, ttl=ttl_seconds)
 
 
 async def decode_jwt(
-        token: str, refresh: bool = False, options: Dict | None = None
-) -> Dict:
+    token: str, refresh: bool = False, options: dict | None = None
+) -> dict:
     secret = (
         settings.JWT_REFRESH_SECRET_KEY.get_secret_value()
         if refresh

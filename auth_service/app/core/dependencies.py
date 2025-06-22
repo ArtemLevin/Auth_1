@@ -1,22 +1,21 @@
-from typing import Any, Dict, List
+from typing import Any
 from uuid import UUID
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
-
+from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from jose.exceptions import ExpiredSignatureError, JWTError
 
-from auth_service.app.core.security import decode_jwt, is_token_blacklisted
-from auth_service.app.db.session import get_db_session
+from auth_service.app.core.security import decode_jwt
+from auth_service.app.db.session import db_helper
 from auth_service.app.models import Role, User, UserRole
 from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 
 
-async def get_token(request: Request) -> str:
+def get_token(request: Request) -> str:
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         logger.warning("Отсутствует или неверный токен авторизации")
@@ -28,7 +27,7 @@ async def get_token(request: Request) -> str:
     return auth_header[7:]
 
 
-async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> List[str]:
+async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
     user_id_str = str(user_id)
     permissions_str = await redis_client.get(f"permissions:{user_id_str}")
     if permissions_str:
@@ -72,8 +71,8 @@ async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> List[str]:
 
 
 async def get_current_user(
-    token: str = Depends(get_token), db: AsyncSession = Depends(get_db_session)
-) -> Dict[str, Any]:
+    token: str = Depends(get_token), db: AsyncSession = Depends(db_helper.get_db_session)
+) -> dict[str, Any]:
     try:
         payload = await decode_jwt(token)
 
@@ -135,7 +134,7 @@ async def get_current_user(
     except ValueError as e:
         logger.warning("Ошибка валидации токена", error=str(e))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception(
             "Произошла непредвиденная ошибка при получении текущего пользователя"
         )
@@ -145,10 +144,10 @@ async def get_current_user(
         )
 
 
-def require_permission(permission: str):
-    async def _require_permission(
-        current_user: Dict[str, Any] = Depends(get_current_user)
-    ):
+def require_permission(permission: str) -> dict[str, Any]:
+    def _require_permission(
+        current_user: dict[str, Any] = Depends(get_current_user)
+    ) -> dict[str, Any]:
         if current_user["is_superuser"] or "*" in current_user["permissions"]:
             logger.debug(
                 "Суперпользователь или имеет все разрешения",
