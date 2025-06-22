@@ -11,7 +11,6 @@ from slowapi.util import get_ipaddr
 from auth_service.app.db.session import db_helper
 from auth_service.app.models import Base
 from auth_service.app.api.v1.routes import auth, roles
-from auth_service.app.models.base import create_database
 from auth_service.app.settings import settings
 from auth_service.app.utils.cache import redis_client, test_connection
 from auth_service.app.core.logging_config import setup_logging
@@ -41,10 +40,10 @@ async def lifespan(app: FastAPI):
     logger.info("Создание моделей базы данных...")
     async with db_helper.engine.begin() as conn: 
         await conn.run_sync(Base.metadata.create_all)
-
     await test_connection()
-    await create_database()
+
     yield
+    
     logger.info("Приложение завершает работу...")
     await db_helper.dispose()
     await redis_client.close()

@@ -4,14 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
 
 from auth_service.app.db.session import db_helper
-from auth_service.app.schemas import LoginRequest, TokenPair
+from auth_service.app.schemas import LoginRequest, TokenPair, RegisterRequest
 from auth_service.app.services.auth_service import AuthService
-from schemas.error import SuccessResponse, ErrorResponseModel
+from auth_service.app.schemas.error import SuccessResponse, ErrorResponseModel
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
 
 async def get_auth_service(db: AsyncSession = Depends(db_helper.get_db_session)) -> AuthService:
     return AuthService(db)

@@ -15,8 +15,8 @@ class Role(Base):
 
     id: Mapped[PyUUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    permissions: Mapped[List[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(Text)
+    permissions: Mapped[list[str]] = mapped_column(
         ARRAY(String(255)), nullable=False, default=list
     )
     created_at: Mapped[datetime] = mapped_column(

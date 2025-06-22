@@ -3,6 +3,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPBearer
 from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -14,18 +15,7 @@ from auth_service.app.schemas.error import ErrorResponseModel
 from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
-
-
-def get_token(request: Request) -> str:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        logger.warning("Отсутствует или неверный токен авторизации")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return auth_header[7:]
+http_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
@@ -72,11 +62,12 @@ async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
 
 
 async def get_current_user(
-    token: str = Depends(get_token), db: AsyncSession = Depends(db_helper.get_db_session)
+    credentials: str = Depends(http_bearer), db: AsyncSession = Depends(db_helper.get_db_session)
 ) -> dict[str, Any]:
+    token = credentials.credentials
     try:
         payload = await decode_jwt(token)
-
+        print(payload)
         user_id_str = payload.get("sub")
         if not user_id_str:
             logger.warning("Неверный токен: отсутствует ID пользователя")
