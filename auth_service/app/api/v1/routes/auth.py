@@ -1,12 +1,17 @@
+from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
 
 from auth_service.app.db.session import db_helper
-from auth_service.app.schemas import LoginRequest, TokenPair, RegisterRequest
+from auth_service.app.schemas import LoginRequest, TokenPair, RegisterRequest, LoginHistoryResponse
 from auth_service.app.services.auth_service import AuthService
 from auth_service.app.schemas.error import SuccessResponse, ErrorResponseModel
+from auth_service.app.schemas.auth import MessageResponse, RefreshToken
+from auth_service.app.schemas.user import UserResponse
+from auth_service.app.core.dependencies import get_current_user
 
 logger = structlog.get_logger(__name__)
 
@@ -166,3 +171,22 @@ async def get_user_login_history(
     user_id = current_user["id"]
     history = await auth_service.get_login_history(user_id)
     return [LoginHistoryResponse.model_validate(entry) for entry in history]
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get user info",
+    description="Retrieve information about the current authenticated user",
+    responses={
+        status.HTTP_200_OK: {"description": "User info retrieved successfully"},
+        status.HTTP_401_UNAUTHORIZED: {"description": "Unauthorized"},
+    },
+)
+async def get_user_info(
+    current_user: dict = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service)
+) -> UserResponse:
+    user_id = current_user["id"]
+    user_info = await auth_service.get_user_info(user_id)
+    return user_info

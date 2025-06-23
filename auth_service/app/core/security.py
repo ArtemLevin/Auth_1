@@ -8,8 +8,8 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Mapped
 
-from app.settings import settings
-from app.utils.cache import redis_client
+from auth_service.app.settings import settings
+from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 

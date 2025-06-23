@@ -7,7 +7,7 @@ from uuid import uuid4
 from sqlalchemy import ARRAY, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from auth_service.app.models.base import Base
 
 
 class Role(Base):
@@ -23,4 +23,9 @@ class Role(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    users: Mapped[list["UserRole"]] = relationship("UserRole", back_populates="role")
+    users: Mapped[list["UserRole"]] = relationship(
+        "UserRole", 
+        back_populates="role", 
+        cascade="all, delete-orphan", 
+        passive_deletes=True
+    )

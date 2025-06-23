@@ -6,11 +6,11 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.role import Role
-from app.models.user import User
-from app.models.user_role import UserRole
-from app.schemas.role import RoleCreate, RoleUpdate
-from app.utils.cache import redis_client
+from auth_service.app.models.role import Role
+from auth_service.app.models.user import User
+from auth_service.app.models.user_role import UserRole
+from auth_service.app.schemas.role import RoleCreate, RoleUpdate
+from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 

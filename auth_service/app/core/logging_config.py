@@ -3,7 +3,7 @@ import logging
 import structlog
 from colorlog import ColoredFormatter
 
-from app.settings import settings
+from auth_service.app.settings import settings
 
 
 def setup_logging():

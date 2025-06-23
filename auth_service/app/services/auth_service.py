@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import desc, or_
 
-from app.core.security import (create_access_token,
+from auth_service.app.core.security import (create_access_token,
                                             create_refresh_token,
                                             get_password_hash, verify_password,
                                             add_to_blacklist, decode_jwt, is_token_blacklisted)
-from app.models import User, LoginHistory
-from app.settings import settings
-
-from app.utils.cache import redis_client
+from auth_service.app.models import User, LoginHistory
+from auth_service.app.settings import settings
+from auth_service.app.schemas.user import UserResponse
+from auth_service.app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 
@@ -99,6 +99,17 @@ class AuthService:
             )
 
         return success, errors
+    
+    async def get_user_info(self, user_id: UUID) -> UserResponse:
+        result = await self.db_session.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+
+        if not user:
+            logger.warning(
+                "Пользователь не найден", user_id=user_id
+            )
+            raise ValueError("User not found")
+        return UserResponse(**user.__dict__)
 
     async def update_profile(
         self,
