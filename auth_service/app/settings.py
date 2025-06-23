@@ -45,10 +45,7 @@ class Settings(ConfigBase):
     )
 
     LOG_LEVEL: str = "INFO"
-    LOG_FILE: str | None = None
     LOG_JSON_FORMAT: bool = False
-    LOG_ROTATION: str = "10 MB"
-    LOG_RETENTION: str = "7 days"
 
     ALLOWED_HOSTS: List[str] = ["*"]
     CORS_ORIGINS: List[str] = ["*"]

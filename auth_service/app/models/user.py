@@ -7,7 +7,7 @@ from typing import List
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from auth_service.app.models.base import Base
+from app.models.base import Base
 
 
 class User(Base):

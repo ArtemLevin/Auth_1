@@ -19,6 +19,8 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./alembic:/app/alembic
 
   postgres:
     image: postgres:15.4

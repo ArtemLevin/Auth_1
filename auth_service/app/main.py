@@ -1,9 +1,8 @@
 import structlog
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, cast
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse # Для кастомного обработчика исключений
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_ipaddr
@@ -17,14 +16,6 @@ from auth_service.app.core.logging_config import setup_logging
 from auth_service.app.schemas.error import ErrorResponseModel
 
 logger = structlog.get_logger(__name__)
-
-# Определяем временный тип для app.state, чтобы добавить атрибут limiter
-if TYPE_CHECKING:
-    from starlette.datastructures import State as StarletteState
-    class AppStateWithLimiter(StarletteState):
-        limiter: Limiter
-else:
-    AppStateWithLimiter = object # Заглушка для runtime, если TYPE_CHECKING не True
 
 limiter = Limiter(
     key_func=get_ipaddr,
@@ -48,6 +39,7 @@ async def lifespan(app: FastAPI):
     await db_helper.dispose()
     await redis_client.close()
 
+
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
@@ -59,20 +51,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Явно приводим тип app.state
-app.state = cast(AppStateWithLimiter, app.state)
 app.state.limiter = limiter
 
-# Обработчик исключений для RateLimitExceeded
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
-    logger.warning("Превышен лимит запросов", ip_address=request.client.host, detail=exc.detail)
+    logger.warning(
+        "Превышен лимит запросов", ip_address=request.client.host, detail=exc.detail
+    )
     error_detail = {"rate_limit": f"Rate limit exceeded: {exc.detail}"}
     return JSONResponse(
         content=ErrorResponseModel(detail=error_detail).model_dump(),
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
     )
 
-# Используем собственный обработчик
+
 app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 
 app.add_middleware(
@@ -82,6 +73,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health_check():
+    return {"status": "ok"}
+
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(roles.router, prefix=settings.API_V1_STR)

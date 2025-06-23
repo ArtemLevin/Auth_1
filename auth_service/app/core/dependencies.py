@@ -25,41 +25,40 @@ async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
         logger.debug("Разрешения получены из кэша Redis", user_id=user_id_str)
         return permissions_str.split(",")
 
-    result = await db.execute(
-        select(Role.permissions)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == user_id)
-    )
-    all_permissions = set()
-    for row in result.scalars().all():
-        all_permissions.update(row)
-
     user_result = await db.execute(select(User.is_superuser).where(User.id == user_id))
     is_superuser = user_result.scalar_one_or_none()
+
     if is_superuser:
-        all_permissions.update(
-            ["manage_roles", "view_content", "manage_users", "admin_panel"]
-        )
         logger.info(
             "Пользователь является суперпользователем, добавлены все разрешения",
             user_id=user_id_str,
         )
+        permissions_list = ["*"]
+    else:
+        result = await db.execute(
+            select(Role.permissions)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+        all_permissions = set()
+        for row in result.scalars().all():
+            all_permissions.update(row)
 
-    permissions_list = list(all_permissions)
+        permissions_list = list(all_permissions)
+        if not permissions_list:
+            logger.info(
+                "Для пользователя не найдено разрешений, по умолчанию 'view_content'",
+                user_id=user_id_str,
+            )
+            permissions_list = ["view_content"]
+
     if permissions_list:
         await redis_client.setex(
             f"permissions:{user_id_str}", 3600, ",".join(permissions_list)
         )
         logger.debug("Разрешения кэшированы в Redis", user_id=user_id_str)
-    else:
-        logger.info(
-            "Для пользователя не найдено разрешений, по умолчанию 'view_content'",
-            user_id=user_id_str,
-        )
-        permissions_list = ["view_content"]
 
     return permissions_list
-
 
 async def get_current_user(
     credentials: str = Depends(http_bearer), db: AsyncSession = Depends(db_helper.get_db_session)
@@ -96,8 +95,6 @@ async def get_current_user(
             )
 
         permissions = await get_cached_permissions(user_id, db)
-        if user_obj.is_superuser:
-            permissions = ["*"]
 
         logger.debug(
             "Текущий пользователь успешно аутентифицирован",
@@ -127,9 +124,11 @@ async def get_current_user(
         logger.warning("Ошибка валидации токена", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ErrorResponseModel(detail={"token": "Token is blacklisted"}).model_dump(),
+            detail=ErrorResponseModel(
+                detail={"token": "Token is blacklisted"}
+            ).model_dump(),
         )
-    except Exception as e:
+    except Exception:
         logger.exception(
             "Произошла непредвиденная ошибка при получении текущего пользователя"
         )

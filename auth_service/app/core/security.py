@@ -8,15 +8,17 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Mapped
 
-from auth_service.app.settings import settings
-from auth_service.app.utils.cache import redis_client
+from app.settings import settings
+from app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def verify_password(plain_password: str, hashed_password: Union[str, Mapped[str]]) -> bool:
+def verify_password(
+    plain_password: str, hashed_password: Union[str, Mapped[str]]
+) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 

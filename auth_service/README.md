@@ -1,3 +1,30 @@
+# Запуск сервисов и генерация миграций
+1. Очистка и остановка: Остановите и удалите все предыдущие контейнеры и тома для чистого старта:
+
+**docker-compose down -v**
+
+2. Пересборка образа: Пересоберите образ auth-service после любых изменений в Dockerfile:
+
+**docker-compose build auth-service**
+
+3. Запуск БД и Redis: Запустите только сервисы базы данных и Redis, дождитесь их готовности (healthy):
+
+**docker-compose up -d db redis**
+
+**docker-compose ps** # Проверить статус
+
+4. Генерация миграции: Сгенерируйте начальную миграцию Alembic. Убедитесь, что файл миграции появился в auth_service/alembic/versions/ на вашей хост-машине:
+
+**docker-compose run --rm --entrypoint bash auth-service -c "alembic -c /app/alembic.ini revision --autogenerate -m \"Create initial tables\""**
+
+5. Полный перезапуск сервисов: Остановите все сервисы и запустите их снова, чтобы применить сгенерированную миграцию:
+
+**docker-compose down**
+
+**docker-compose up -d**
+
+**docker-compose ps** # Убедитесь, что все сервисы Up (healthy)
+
 # Сервис Авторизации и Управления Ролями для Онлайн-Кинотеатра
 
 ## Описание Проекта

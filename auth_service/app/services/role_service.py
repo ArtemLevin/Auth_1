@@ -6,11 +6,11 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from auth_service.app.models.role import Role
-from auth_service.app.models.user import User
-from auth_service.app.models.user_role import UserRole
-from auth_service.app.schemas.role import RoleCreate, RoleUpdate
-from auth_service.app.utils.cache import redis_client
+from app.models.role import Role
+from app.models.user import User
+from app.models.user_role import UserRole
+from app.schemas.role import RoleCreate, RoleUpdate
+from app.utils.cache import redis_client
 
 logger = structlog.get_logger(__name__)
 
@@ -51,9 +51,7 @@ class RoleService:
             logger.debug("Роль не найдена по ID", role_id=role_id)
         return role
 
-    async def update_role(
-        self, role_id: UUID, role_update: RoleUpdate
-    ) -> Role | None:
+    async def update_role(self, role_id: UUID, role_update: RoleUpdate) -> Role | None:
         role = await self.db_session.get(Role, role_id)
         if not role:
             logger.warning("Роль не найдена для обновления", role_id=role_id)
