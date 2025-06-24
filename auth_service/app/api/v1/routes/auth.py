@@ -1,7 +1,7 @@
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 from uuid import UUID
 
 from app.db.session import get_db_session
@@ -90,15 +90,27 @@ async def register(
 @router.post(
     "/logout",
     response_model=MessageResponse,
-    responses={200: {"model": MessageResponse, "description": "Logged out"}},
+    responses={
+        200: {"model": MessageResponse, "description": "Logged out"},
+        400: {"model": MessageResponse, "description": "Invalid refresh token"}
+    },
     summary="Log out from current session",
     description="Invalidates the provided refresh token, effectively logging out the user from this session.",
 )
 async def logout(
     request_data: RefreshToken, auth_service: AuthService = Depends(get_auth_service)
-) -> MessageResponse:
-    await auth_service.logout(request_data.refresh_token)
-    return MessageResponse(message="Logged out")
+) -> JSONResponse:
+    success = await auth_service.logout(request_data.refresh_token)
+    if success:
+        return JSONResponse(
+            content=MessageResponse(message="Logged out").dict(),
+            status_code=status.HTTP_200_OK
+        )
+    else:
+        return JSONResponse(
+            content=MessageResponse(message="Incorrect refresh token").dict(),
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
 
 
 @router.post(

@@ -147,8 +147,12 @@ class AuthService:
         logger.info("Запрошена история входов пользователя", user_id=user_id, count=len(history))
         return list(history)
 
-    async def logout(self, refresh_token: str) -> None:
-        token = await decode_jwt(refresh_token, refresh=True)
+    async def logout(self, refresh_token: str) -> bool:
+        try:
+            token = await decode_jwt(refresh_token, refresh=True)
+        except JWTError:
+            return False
+
         jti = token["jti"]
         user_id = UUID(token["sub"])
 
@@ -161,6 +165,7 @@ class AuthService:
         await add_to_blacklist(jti, ttl)
         await redis_client.srem(f"user_active_refresh_jtis:{user_id}", jti)
         logger.info("Пользователь вышел из системы", jti=jti, user_id=user_id)
+        return True
 
     async def refresh_tokens(self, refresh_token: str) -> dict | None:
         try:
