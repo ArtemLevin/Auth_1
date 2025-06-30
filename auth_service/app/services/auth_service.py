@@ -40,7 +40,7 @@ class AuthService:
         refresh_payload = await decode_jwt(refresh_token, refresh=True)
         refresh_jti = refresh_payload["jti"]
         await redis_client.sadd(f"user_active_refresh_jtis:{user.id}", refresh_jti)
-        await redis_client.expire(f"user_active_refresh_jtis:{user.id}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600) # В секундах
+        await redis_client.expire(f"user_active_refresh_jtis:{user.id}", settings.refresh_token_expire_days * 24 * 3600)
 
         login_history_entry = LoginHistory(
             user_id=user.id,
@@ -148,14 +148,16 @@ class AuthService:
         logger.info("Профиль пользователя успешно обновлен", user_id=user_id)
         return user
 
-    async def get_login_history(self, user_id: UUID) -> list[LoginHistory]:
+    async def get_login_history(self, user_id: UUID, limit: int = 100, offset: int = 0) -> list[LoginHistory]:
         result = await self.db_session.execute(
             select(LoginHistory)
             .where(LoginHistory.user_id == user_id)
             .order_by(desc(LoginHistory.login_at))
+            .offset(offset)
+            .limit(limit)
         )
         history = result.scalars().all()
-        logger.info("Запрошена история входов пользователя", user_id=user_id, count=len(history))
+        logger.info("Запрошена история входов пользователя", user_id=user_id, count=len(history), limit=limit, offset=offset)
         return list(history)
 
     async def logout(self, refresh_token: str) -> None:
@@ -199,7 +201,7 @@ class AuthService:
             await redis_client.srem(f"user_active_refresh_jtis:{user_id}", jti)
             new_refresh_payload = await decode_jwt(new_refresh_token, refresh=True)
             await redis_client.sadd(f"user_active_refresh_jtis:{user_id}", new_refresh_payload["jti"])
-            await redis_client.expire(f"user_active_refresh_jtis:{user_id}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600)
+            await redis_client.expire(f"user_active_refresh_jtis:{user_id}", settings.refresh_token_expire_days * 24 * 3600)
 
             logger.info("Токены успешно обновлены", user_id=user_id)
             return {"access_token": new_access_token, "refresh_token": new_refresh_token}
@@ -218,12 +220,12 @@ class AuthService:
 
         for jti_to_blacklist in active_jtis:
             if jti_to_blacklist != current_jti:
-                await add_to_blacklist(jti_to_blacklist, settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600)
+                await add_to_blacklist(jti_to_blacklist, settings.refresh_token_expire_days * 24 * 3600)
                 logger.info("Токен добавлен в черный список (logout_all_other_sessions)", user_id=user_id, jti=jti_to_blacklist)
 
         await redis_client.delete(f"user_active_refresh_jtis:{user_id}")
         await redis_client.sadd(f"user_active_refresh_jtis:{user_id}", current_jti)
-        await redis_client.expire(f"user_active_refresh_jtis:{user_id}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600)
+        await redis_client.expire(f"user_active_refresh_jtis:{user_id}", settings.refresh_token_expire_days * 24 * 3600)
 
         logger.info(
             "Все остальные сессии пользователя завершены",

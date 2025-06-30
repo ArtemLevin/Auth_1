@@ -7,12 +7,17 @@ from fastapi.security import HTTPBearer
 from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from jose.exceptions import ExpiredSignatureError, JWTError
 
-from auth_service.app.core.security import decode_jwt
-from auth_service.app.db.session import db_helper
-from auth_service.app.models import Role, User, UserRole
-from auth_service.app.schemas.error import ErrorResponseModel
-from auth_service.app.utils.cache import redis_client
+from app.core.security import decode_jwt
+from app.db.session import get_db_session
+from app.models import Role, User, UserRole
+from app.schemas.error import ErrorResponseModel
+from app.utils.cache import redis_client
+from app.utils.rate_limiter import RedisLeakyBucketRateLimiter
+from app.settings import settings
+
+from app.utils.rate_limiter import get_rate_limiter
 
 logger = structlog.get_logger(__name__)
 http_bearer = HTTPBearer(auto_error=False)
@@ -60,10 +65,31 @@ async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
 
     return permissions_list
 
+
+async def get_user_roles(user_id: UUID, db: AsyncSession) -> List[str]:
+    roles_list = []
+    user_result = await db.execute(select(User.is_superuser).where(User.id == user_id))
+    is_superuser = user_result.scalar_one_or_none()
+
+    if is_superuser:
+        roles_list.append("superuser")
+
+    role_names_result = await db.execute(
+        select(Role.name)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == user_id)
+    )
+    roles_list.extend(role_names_result.scalars().all())
+
+    if not is_superuser and not roles_list:
+        roles_list.append("user")
+
+    return list(set(roles_list))
+
+
 async def get_current_user(
-    credentials: str = Depends(http_bearer), db: AsyncSession = Depends(db_helper.get_db_session)
-) -> dict[str, Any]:
-    token = credentials.credentials
+    token: str = Depends(get_token), db: AsyncSession = Depends(get_db_session)
+) -> Dict[str, Any]:
     try:
         payload = await decode_jwt(token)
         print(payload)
@@ -95,12 +121,14 @@ async def get_current_user(
             )
 
         permissions = await get_cached_permissions(user_id, db)
+        roles = await get_user_roles(user_id, db)
 
         logger.debug(
             "Текущий пользователь успешно аутентифицирован",
             user_id=user_id,
             login=user_obj.login,
             permissions=permissions,
+            roles=roles,
         )
         return {
             "id": str(user_id),
@@ -108,6 +136,7 @@ async def get_current_user(
             "mfa_verified": payload.get("mfa_verified", False),
             "is_superuser": user_obj.is_superuser,
             "permissions": permissions,
+            "roles": roles,
         }
 
     except ExpiredSignatureError:
@@ -138,10 +167,10 @@ async def get_current_user(
         )
 
 
-def require_permission(permission: str) -> dict[str, Any]:
-    def _require_permission(
-        current_user: dict[str, Any] = Depends(get_current_user)
-    ) -> dict[str, Any]:
+def require_permission(permission: str):
+    async def _require_permission(
+        current_user: Dict[str, Any] = Depends(get_current_user),
+    ):
         if current_user["is_superuser"] or "*" in current_user["permissions"]:
             logger.debug(
                 "Суперпользователь или имеет все разрешения",
@@ -169,3 +198,43 @@ def require_permission(permission: str) -> dict[str, Any]:
         return current_user
 
     return _require_permission
+
+
+async def rate_limit_dependency(
+        request: Request,
+        traffic_type: str,
+        current_user: Dict[str, Any] | None = Depends(get_current_user),
+        rate_limiter: RedisLeakyBucketRateLimiter = Depends(get_rate_limiter)
+):
+    identifier = request.client.host if request.client else "unknown_ip"
+    user_roles = ["guest"]
+
+    if current_user:
+        identifier = current_user["id"]
+        user_roles = current_user["roles"]
+        if not user_roles:
+            user_roles = ["user"]
+
+    if not current_user and "guest" not in user_roles:
+        user_roles.append("guest")
+    elif current_user and not user_roles:
+        user_roles.append("user")
+
+    allowed = await rate_limiter.allow_request(identifier, user_roles, traffic_type)
+
+    if not allowed:
+        logger.warning(
+            "Превышен лимит запросов",
+            identifier=identifier,
+            traffic_type=traffic_type,
+            user_roles=user_roles,
+            path=request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=ErrorResponseModel(
+                detail={"rate_limit": "Too many requests. Please try again later."}
+            ).model_dump(),
+        )
+    logger.debug("Проверка лимита запросов пройдена", identifier=identifier, traffic_type=traffic_type,
+                 user_roles=user_roles)

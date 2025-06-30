@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional, Annotated
-from annotated_types import MaxLen, MinLen
+from annotated_types import MaxLen
 from datetime import datetime
 from uuid import UUID
 

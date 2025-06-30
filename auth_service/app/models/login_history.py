@@ -12,7 +12,7 @@ class LoginHistory(Base):
     __tablename__ = "login_history"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     login_at = Column(DateTime(timezone=True), server_default=func.now())
     ip_address = Column(String(50))
     user_agent = Column(String(255))

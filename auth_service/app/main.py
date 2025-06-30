@@ -1,27 +1,17 @@
 import structlog
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_ipaddr
 
-from auth_service.app.db.session import db_helper
-from auth_service.app.models import Base
-from auth_service.app.api.v1.routes import auth, roles
-from auth_service.app.settings import settings
-from auth_service.app.utils.cache import redis_client, test_connection
-from auth_service.app.core.logging_config import setup_logging
-from auth_service.app.schemas.error import ErrorResponseModel
+from app.api.v1.routes import auth, roles
+from app.settings import settings
+from app.utils.cache import redis_client, test_connection
+from app.core.logging_config import setup_logging
+from app.schemas.error import ErrorResponseModel
+from app.utils.rate_limiter import RedisLeakyBucketRateLimiter
 
 logger = structlog.get_logger(__name__)
 
-limiter = Limiter(
-    key_func=get_ipaddr,
-    default_limits=[settings.RATE_LIMIT_DEFAULT],
-    storage_uri=settings.REDIS_URL.get_secret_value(),
-)
 
 
 @asynccontextmanager
@@ -32,7 +22,7 @@ async def lifespan(app: FastAPI):
     async with db_helper.engine.begin() as conn: 
         await conn.run_sync(Base.metadata.create_all)
     await test_connection()
-
+    app.state.rate_limiter = RedisLeakyBucketRateLimiter(redis_client, settings)
     yield
     
     logger.info("Приложение завершает работу...")
@@ -41,34 +31,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
-    debug=settings.DEBUG,
+    title=settings.app_name,
+    debug=settings.debug,
     version="0.1.0",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=f"{settings.api_v1_str}/docs",
+    redoc_url=f"{settings.api_v1_str}/redoc",
+    openapi_url=f"{settings.api_v1_str}/openapi.json",
     lifespan=lifespan,
 )
 
-app.state.limiter = limiter
-
-async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
-    logger.warning(
-        "Превышен лимит запросов", ip_address=request.client.host, detail=exc.detail
-    )
-    error_detail = {"rate_limit": f"Rate limit exceeded: {exc.detail}"}
-    return JSONResponse(
-        content=ErrorResponseModel(detail=error_detail).model_dump(),
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-    )
-
-
-app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,5 +55,8 @@ async def health_check():
     return {"status": "ok"}
 
 
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(roles.router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix=settings.api_v1_str)
+app.include_router(roles.router, prefix=settings.api_v1_str)
+
+async def get_rate_limiter(request: Request) -> RedisLeakyBucketRateLimiter:
+    return request.app.state.rate_limiter

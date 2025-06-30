@@ -25,5 +25,11 @@ class User(Base):
         DateTime(timezone=True), onupdate=func.now()
     )
 
+<<<<<<< HEAD
     roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user")
     history: Mapped[List["LoginHistory"]] = relationship("LoginHistory", back_populates="user")
+=======
+    roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+    history: Mapped[List["LoginHistory"]] = relationship(
+        "LoginHistory", back_populates="user", cascade="all, delete-orphan")
+>>>>>>> main

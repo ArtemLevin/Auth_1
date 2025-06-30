@@ -14,6 +14,7 @@ MANIFEST
 .DS_Store
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
@@ -23,6 +24,7 @@ ENV.bak/
 .Python
 env/
 venv/
+.venv/
 virtualenv/
 .pyenv/
 .python
@@ -161,3 +163,4 @@ create_labels.sh
 dev1_issues.yaml
 dev2_issues.yaml
 dev3_issues.yaml
+create_issues.py

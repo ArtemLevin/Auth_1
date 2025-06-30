@@ -38,7 +38,7 @@ def create_access_token(
 ) -> str:
     to_encode = payload.copy() if payload else {}
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=expires_minutes or settings.access_token_expire_minutes
     )
     jti = generate_jti()
     to_encode.update(
@@ -46,8 +46,8 @@ def create_access_token(
     )
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.JWT_SECRET_KEY.get_secret_value(),
-        algorithm=settings.JWT_ALGORITHM,
+        settings.jwt_secret_key.get_secret_value(),
+        algorithm=settings.jwt_algorithm,
     )
     logger.debug("Создан access токен", user_id=subject, jti=jti)
     return encoded_jwt
@@ -60,14 +60,14 @@ def create_refresh_token(
 ) -> str:
     to_encode = payload.copy() if payload else {}
     expire = datetime.now(timezone.utc) + timedelta(
-        days=expires_days or settings.REFRESH_TOKEN_EXPIRE_DAYS
+        days=expires_days or settings.refresh_token_expire_days
     )
     jti = generate_jti()
     to_encode.update({"exp": expire, "sub": str(subject), "jti": jti})
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.JWT_REFRESH_SECRET_KEY.get_secret_value(),
-        algorithm=settings.JWT_ALGORITHM,
+        settings.jwt_refresh_secret_key.get_secret_value(),
+        algorithm=settings.jwt_algorithm,
     )
     logger.debug("Создан refresh токен", user_id=subject, jti=jti)
     return encoded_jwt
@@ -87,13 +87,13 @@ async def decode_jwt(
     token: str, refresh: bool = False, options: dict | None = None
 ) -> dict:
     secret = (
-        settings.JWT_REFRESH_SECRET_KEY.get_secret_value()
+        settings.jwt_refresh_secret_key.get_secret_value()
         if refresh
-        else settings.JWT_SECRET_KEY.get_secret_value()
+        else settings.jwt_secret_key.get_secret_value()
     )
     try:
         decoded = jwt.decode(
-            token, secret, algorithms=[settings.JWT_ALGORITHM], options=options or {}
+            token, secret, algorithms=[settings.jwt_algorithm], options=options or {}
         )
     except ExpiredSignatureError:
         logger.warning("Попытка декодировать истекший токен")

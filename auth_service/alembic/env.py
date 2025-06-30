@@ -19,7 +19,7 @@ from app.models.base import Base
 config = context.config
 fileConfig(config.config_file_name)
 
-ASYNC_URL = settings.DATABASE_URL
+ASYNC_URL = settings.database_url
 SYNC_URL = ASYNC_URL.replace("+asyncpg", "")
 
 target_metadata = Base.metadata

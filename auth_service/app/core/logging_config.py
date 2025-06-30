@@ -11,7 +11,7 @@ def setup_logging():
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    if not settings.LOG_JSON_FORMAT:
+    if not settings.log_json_format:
         formatter = ColoredFormatter(
             "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(name)-25s%(reset)s %(white)s%(message)s",
             log_colors={
@@ -37,7 +37,7 @@ def setup_logging():
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
-    root_logger.setLevel(settings.LOG_LEVEL)
+    root_logger.setLevel(settings.log_level)
 
     shared_processors = [
         structlog.contextvars.merge_contextvars,
@@ -55,7 +55,7 @@ def setup_logging():
         ),
     ]
 
-    if settings.LOG_JSON_FORMAT:
+    if settings.log_json_format:
         processors = shared_processors + [structlog.processors.JSONRenderer()]
     else:
         processors = shared_processors + [structlog.dev.ConsoleRenderer()]

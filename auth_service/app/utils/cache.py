@@ -6,7 +6,7 @@ from auth_service.app.settings import settings
 logger = structlog.get_logger(__name__)
 
 redis_client = aioredis.from_url(
-    settings.REDIS_URL.get_secret_value(), decode_responses=True
+    settings.redis_url.get_secret_value(), decode_responses=True
 )
 
 

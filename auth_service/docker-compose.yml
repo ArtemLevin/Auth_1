@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.0-alpine
+    image: redis/redis-stack:latest
     container_name: auth-redis
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
