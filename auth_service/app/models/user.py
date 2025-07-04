@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List
+
+from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from uuid import UUID as PyUUID
 from uuid import uuid4
+
 
 from app.models.base import Base
 from sqlalchemy import Boolean, DateTime, String, func
@@ -27,6 +32,13 @@ class User(Base):
 
     roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     history: Mapped[List["LoginHistory"]] = relationship(
+
+        "LoginHistory", back_populates="user", cascade="all, delete-orphan"
+    )
+    social_accounts: Mapped[list["UserSocialAccount"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
         "LoginHistory", back_populates="user", cascade="all, delete-orphan")
 
     yandex_id: Mapped[str | None] = mapped_column(String(255), unique=True,
@@ -35,3 +47,4 @@ class User(Base):
                                               nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(255), unique=True,
                                                   nullable=True)
+

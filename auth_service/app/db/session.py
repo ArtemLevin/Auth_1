@@ -21,6 +21,9 @@ AsyncDBSession = sessionmaker(
 )
 
 
+async def dispose(self) -> None:
+    await self.engine.dispose()
+
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncDBSession() as session:
         try:

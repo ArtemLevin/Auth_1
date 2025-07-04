@@ -3,6 +3,7 @@ import json
 from typing import Literal
 from uuid import UUID
 
+import secrets
 import structlog
 from app.core.security import (add_to_blacklist, create_access_token,
                                create_refresh_token, decode_jwt,
@@ -16,7 +17,24 @@ from sqlalchemy import desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+
+from app.core.oauth import OAuthProvider
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    get_password_hash, 
+    verify_password,
+    add_to_blacklist, 
+    decode_jwt, 
+    is_token_blacklisted
+)
+from app.models import User, LoginHistory, UserSocialAccount
+from app.settings import settings
+from app.schemas.user import UserResponse
+from app.utils.cache import redis_client
+
 from app.utils.password_generator import generate_password
+
 
 logger = structlog.get_logger(__name__)
 
@@ -25,15 +43,7 @@ class AuthService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def login(self, login: str, password: str, ip_address: str | None = None, user_agent: str | None = None) -> dict | None:
-        result = await self.db_session.execute(select(User).where(User.login == login))
-        user = result.scalars().first()
-        if not user or not verify_password(password, user.password_hash):
-            logger.warning(
-                "Неудачная попытка входа: неверный логин или пароль", login=login
-            )
-            return None
-
+    async def social_login(self, user: User, ip_address: str | None = None, user_agent: str | None = None):
         access_token = create_access_token(
             subject=user.id, payload={"login": user.login}
         )
@@ -57,6 +67,17 @@ class AuthService:
             "Пользователь успешно вошел в систему", user_id=user.id, login=user.login
         )
         return {"access_token": access_token, "refresh_token": refresh_token}
+
+    async def login(self, login: str, password: str | None = None, ip_address: str | None = None, user_agent: str | None = None) -> dict | None:
+        result = await self.db_session.execute(select(User).where(User.login == login))
+        user = result.scalars().first()
+        if not user or not verify_password(password, user.password_hash):
+            logger.warning(
+                "Неудачная попытка входа: неверный логин или пароль", login=login
+            )
+            return None
+
+        return await self.social_login(user, ip_address, user_agent)
 
     async def register(
         self, login: str, password: str, email: str | None = None
@@ -101,7 +122,19 @@ class AuthService:
                 login=user.login,
             )
 
-        return success, errors, user
+        return success, errors
+    
+    async def get_user_info(self, user_id: UUID) -> UserResponse:
+        result = await self.db_session.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+
+        if not user:
+            logger.warning(
+                "Пользователь не найден", user_id=user_id
+            )
+            raise ValueError("User not found")
+        return UserResponse(**user.__dict__)
+      
 
     async def update_profile(
         self,
@@ -225,6 +258,68 @@ class AuthService:
             current_jti=current_jti,
         )
 
+
+    def extract_social_data(self, provider, user_info):
+        if provider == OAuthProvider.yandex:
+            return user_info["id"], user_info["default_email"], user_info["login"]
+        elif provider == OAuthProvider.google:
+            return user_info["sub"], user_info["email"], user_info["email"].split("@")[0]
+        elif provider == OAuthProvider.vk:
+            return user_info["id"], user_info["email"], user_info["name"]
+        
+    async def handle_social_login(self, provider: OAuthProvider, user_info: dict) -> tuple[User, bytes | None]:
+        social_id, email, login = self.extract_social_data(provider, user_info)
+
+        # есть ли пользователь в бд с таким же email и без social_id?
+        query = select(User).outerjoin(UserSocialAccount).where(User.email == email)
+        result = await self.db_session.execute(query)
+
+        if (user := result.scalar_one_or_none()):
+            logger.info(
+                "Пользователь с таким email уже существует. Обновляем профиль пользователя",
+                social_id=social_id, 
+                provider=provider,
+            )
+            has_same_social = any(
+                account.provider == provider.value and account.provider_user_id == social_id
+                for account in user.social_accounts
+            )
+            if has_same_social:
+                logger.info(
+                    "Пользователь с таким social_id и provider уже существует",
+                    social_id=social_id, 
+                    provider=provider,
+                )
+
+                return user
+
+            user.social_accounts.append(UserSocialAccount(provider=provider, provider_user_id=social_id))
+            await self.db_session.commit()
+
+            logger.info(
+                "Аккаунт добавлен к существующему пользователю",
+                email=email, 
+                provider=provider,
+            )
+
+            return user
+
+        else:
+            init_password = secrets.token_bytes(16)
+            account = UserSocialAccount(provider=provider.value, provider_user_id=social_id,)
+            user = User(password_hash=get_password_hash(init_password), login=login, email=email, social_accounts=[account])
+            self.db_session.add(user)
+            await self.db_session.commit()
+            await self.db_session.refresh(user)
+            logger.info(
+                f"Новый пользователь успешно зарегистрирован, временный пароль - {init_password}",
+                provider=provider, 
+                provider_user_id=social_id,
+            )
+
+            return user
+
+
     async def handle_social_login(
             self, provider: Literal["yandex", "vk", "google"],
             user_info: dict
@@ -278,3 +373,4 @@ class AuthService:
         await self.db_session.refresh(user)
 
         return user.id, user.login
+

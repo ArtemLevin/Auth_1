@@ -8,11 +8,15 @@ from app.settings import settings
 from redis import asyncio as aioredis
 from redis.commands.json.path import Path
 
+from app.settings import Settings, settings
+
+from app.schemas.ratelimiting import RateLimitConfigDict, RateLimitConfig, RoleBasedLimits
+
 logger = structlog.get_logger(__name__)
 
 
 class RedisLeakyBucketRateLimiter:
-    def __init__(self, redis_client: aioredis.Redis, settings: settings):
+    def __init__(self, redis_client: aioredis.Redis, settings: Settings):
         self.redis = redis_client
         self.settings = settings
         self.rate_limit_config: RateLimitConfigDict = settings.rate_limit_config
@@ -36,8 +40,6 @@ class RedisLeakyBucketRateLimiter:
 
 
 async def allow_request(self, identifier: str, user_roles: List[str], traffic_type: str = "default") -> bool:
-
-
     key = f"rate_limit:{traffic_type}:{identifier}"
 
     config: RateLimitConfig = await self._get_effective_config(user_roles, traffic_type)
@@ -86,7 +88,8 @@ async def allow_request(self, identifier: str, user_roles: List[str], traffic_ty
 
 
 async def get_rate_limiter(
-        redis_client: aioredis.Redis,
-        settings: settings) -> RedisLeakyBucketRateLimiter:
+    redis_client: aioredis.Redis,
+    settings: Settings
+) -> RedisLeakyBucketRateLimiter:
 
     return RedisLeakyBucketRateLimiter(redis_client, settings)

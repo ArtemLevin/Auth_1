@@ -1,11 +1,21 @@
-from typing import Any, Dict, List
+from typing import Any
 from uuid import UUID
 
 import structlog
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose.exceptions import ExpiredSignatureError, JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from jose.exceptions import ExpiredSignatureError, JWTError
 from app.core.security import decode_jwt
 from app.db.session import get_db_session
 from app.models import Role, User, UserRole
 from app.schemas.error import ErrorResponseModel
+from app.utils.cache import redis_client
+from app.utils.rate_limiter import RedisLeakyBucketRateLimiter
+from app.utils.rate_limiter import get_rate_limiter
+
 from app.settings import settings
 from app.utils.cache import redis_client
 from app.utils.rate_limiter import (RedisLeakyBucketRateLimiter,
@@ -15,22 +25,12 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+
 logger = structlog.get_logger(__name__)
+http_bearer = HTTPBearer(auto_error=False)
 
 
-async def get_token(request: Request) -> str:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        logger.warning("Отсутствует или неверный токен авторизации")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return auth_header[7:]
-
-
-async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> List[str]:
+async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> list[str]:
     user_id_str = str(user_id)
     permissions_str = await redis_client.get(f"permissions:{user_id_str}")
     if permissions_str:
@@ -73,7 +73,7 @@ async def get_cached_permissions(user_id: UUID, db: AsyncSession) -> List[str]:
     return permissions_list
 
 
-async def get_user_roles(user_id: UUID, db: AsyncSession) -> List[str]:
+async def get_user_roles(user_id: UUID, db: AsyncSession) -> list[str]:
     roles_list = []
     user_result = await db.execute(select(User.is_superuser).where(User.id == user_id))
     is_superuser = user_result.scalar_one_or_none()
@@ -95,8 +95,16 @@ async def get_user_roles(user_id: UUID, db: AsyncSession) -> List[str]:
 
 
 async def get_current_user(
-        token: str = Depends(get_token), db: AsyncSession = Depends(get_db_session)
-) -> Dict[str, Any]:
+    credentials: HTTPAuthorizationCredentials = Depends(http_bearer), db: AsyncSession = Depends(get_db_session)
+) -> dict[str, Any]:
+    if not credentials or not credentials.credentials:
+        logger.warning("Access token истек или отсутствует в заголовках")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid access token",
+        )
+
+    token = credentials.credentials
     try:
         payload = await decode_jwt(token)
 
@@ -176,7 +184,7 @@ async def get_current_user(
 
 def require_permission(permission: str):
     async def _require_permission(
-            current_user: Dict[str, Any] = Depends(get_current_user),
+        current_user: dict[str, Any] = Depends(get_current_user),
     ):
         if current_user["is_superuser"] or "*" in current_user["permissions"]:
             logger.debug(
@@ -210,7 +218,7 @@ def require_permission(permission: str):
 async def rate_limit_dependency(
         request: Request,
         traffic_type: str,
-        current_user: Dict[str, Any] | None = Depends(get_current_user),
+        current_user: dict[str, Any] | None = Depends(get_current_user),
         rate_limiter: RedisLeakyBucketRateLimiter = Depends(get_rate_limiter)
 ):
     identifier = request.client.host if request.client else "unknown_ip"
@@ -243,5 +251,9 @@ async def rate_limit_dependency(
                 detail={"rate_limit": "Too many requests. Please try again later."}
             ).model_dump(),
         )
-    logger.debug("Проверка лимита запросов пройдена", identifier=identifier, traffic_type=traffic_type,
-                 user_roles=user_roles)
+    logger.debug(
+        "Проверка лимита запросов пройдена",
+        identifier=identifier,
+        traffic_type=traffic_type,
+        user_roles=user_roles
+    )

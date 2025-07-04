@@ -1,12 +1,19 @@
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI, Request, status, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+
+
 import structlog
 from app.api.v1.routes import auth, roles
 from app.core.logging_config import setup_logging
+
 from app.core.tracing import setup_tracing
 from app.schemas.error import ErrorResponseModel
 from app.settings import settings
 from app.utils.cache import redis_client, test_connection
+
 from app.utils.rate_limiter import RedisLeakyBucketRateLimiter
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,12 +51,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+app.add_middleware(SessionMiddleware, secret_key=settings.social_auth_secret_key)
+
+
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     return {"status": "ok"}
 
 
 app.include_router(auth.router, prefix=settings.api_v1_str)
+# app.include_router(social_auth.router, prefix=settings.api_v1_str)
 app.include_router(roles.router, prefix=settings.api_v1_str)
 
 setup_tracing(app)
