@@ -23,21 +23,24 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE TABLE login_history (
-        id        UUID PRIMARY KEY,
+        id        UUID,
         user_id   UUID NOT NULL,
         login_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
         ip_address VARCHAR(50),
         user_agent VARCHAR(255),
         CONSTRAINT fk_login_history_user FOREIGN KEY (user_id)
-          REFERENCES users(id) ON DELETE CASCADE
+          REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (id, login_at)
     ) PARTITION BY RANGE (login_at);
     """)
 
     op.execute("""
-    CREATE TABLE login_history_2025_06 PARTITION OF login_history
-      FOR VALUES FROM ('2025-06-01') TO ('2025-07-01');
-    CREATE TABLE login_history_2025_07 PARTITION OF login_history
-      FOR VALUES FROM ('2025-07-01') TO ('2025-08-01');
+        CREATE TABLE login_history_2025_06 PARTITION OF login_history
+          FOR VALUES FROM ('2025-06-01') TO ('2025-07-01');
+    """)
+    op.execute("""
+         CREATE TABLE login_history_2025_07 PARTITION OF login_history
+          FOR VALUES FROM ('2025-07-01') TO ('2025-08-01');
     """)
 
     op.execute("""
