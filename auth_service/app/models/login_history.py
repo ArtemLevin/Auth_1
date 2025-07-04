@@ -8,7 +8,6 @@ from sqlalchemy.sql import func
 
 
 class LoginHistory(Base):
-    __abstract__ = True
     __tablename__ = "login_history"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
