@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+
 ## [1.0.1] - 2025-07-04
 
 ### Added
@@ -23,7 +24,25 @@
   not available for app. Please try again later or contact the app administrator` от VK API (возможные причины: 
   неправильные настройки приложения или удаление со стороны VK).
 
-## [1.0.0] - 2025-04-05
+## [1.0.0] - 2025-07-03
+
+### Added
+- Интеграция распределённой трассировки через OpenTelemetry с Jaeger  
+  - добавлены зависимости: `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-jaeger`, `opentelemetry-instrumentation-fastapi`, `opentelemetry-instrumentation-sqlalchemy`, `opentelemetry-instrumentation-redis`, `opentelemetry-instrumentation-httpx`  
+  - реализован модуль инициализации трассировки в `app/core/tracing.py`  
+  - инструментирование FastAPI, SQLAlchemy, Redis и HTTPX  
+  - в `docker-compose.yml` добавлен сервис `jaeger` для сбора и просмотра трассировок
+
+- Партицирование таблицы `login_history` по полю `login_at`  
+  - создана Alembic-миграция `partition_login_history`  
+  - в `upgrade()`:
+    1. переименование старой таблицы `login_history` в `login_history_old`  
+    2. создание родительской таблицы `login_history PARTITION BY RANGE (login_at)`  
+    3. создание партиций 
+    4. перенос данных из `login_history_old` и удаление её  
+    5. добавление индексов на новые партиции  
+  - в `downgrade()` обратное преобразование к единой таблице  
+
 
 ### Added
 - Образ Redis изменён на `redis/redis-stack:latest` для поддержки модуля RedisJSON.
@@ -44,4 +63,3 @@
 ### Removed
 - Настройки `rate_limit_default`, `rate_limit_storage` из `settings.py`.
 - Инициализация `SlowAPI` из `main.py`.
-

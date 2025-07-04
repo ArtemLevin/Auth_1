@@ -1,31 +1,60 @@
-# https://github.com/ArtemLevin/Auth_sprint_1.git
+https://github.com/ArtemLevin/Auth_sprint_1.git
 
 # Запуск сервисов и генерация миграций
+
 1. Очистка и остановка: Остановите и удалите все предыдущие контейнеры и тома для чистого старта:
 
-**docker-compose down -v**
+**docker compose down -v**
 
 2. Пересборка образа: Пересоберите образ auth-service после любых изменений в Dockerfile:
 
-**docker-compose build auth-service**
+**docker compose build auth-service**
 
 3. Запуск БД и Redis: Запустите только сервисы базы данных и Redis, дождитесь их готовности (healthy):
 
-**docker-compose up -d db redis**
+**docker compose up -d db redis**
 
-**docker-compose ps** # Проверить статус
+**docker compose ps** # Проверить статус
 
 4. Генерация миграции: Сгенерируйте начальную миграцию Alembic. Убедитесь, что файл миграции появился в auth_service/alembic/versions/ на вашей хост-машине:
 
-**docker-compose run --rm --entrypoint bash auth-service -c "alembic -c /app/alembic.ini revision --autogenerate -m \"Create initial tables\""**
+**docker compose run --rm --entrypoint bash auth-service -c "alembic -c /app/alembic.ini revision --autogenerate -m \"Create initial tables\""**
 
 5. Полный перезапуск сервисов: Остановите все сервисы и запустите их снова, чтобы применить сгенерированную миграцию:
 
-**docker-compose down**
+**docker compose down**
 
-**docker-compose up -d**
+**docker compose up -d**
 
-**docker-compose ps** # Убедитесь, что все сервисы Up (healthy)
+**docker compose ps** # Убедитесь, что все сервисы Up (healthy)
+
+# Партицирование по диапазону дат поля login_at
+
+1. Сгенерировать заготовку миграции с нужными метаданными:
+
+**docker compose run --rm --entrypoint bash auth-service \
+  -c "alembic -c /app/alembic.ini revision --autogenerate -m \"Partition login_history by login_at\""**
+
+2. Дополнить файл миграции DDL-командами из alembic/versions/create_login_history_partitions.py
+
+3. Убедиться, что Docker-образ пересобран (если меняли Alembic-конфиг или зависимости):
+
+**docker compose build auth-service**
+
+4. Запустить базу данных и Redis
+
+**docker compose up -d db redis**
+
+**docker compose ps**
+
+5. Применить миграции к БД, включая новую
+
+**docker compose run --rm --entrypoint bash auth-service \
+  -c "alembic -c /app/alembic.ini upgrade head"**
+
+6. Перезапустить сервис авторизации
+
+**docker compose up -d auth-service**
 
 # Сервис Авторизации и Управления Ролями для Онлайн-Кинотеатра
 

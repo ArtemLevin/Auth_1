@@ -1,11 +1,11 @@
 import os
 from typing import List, Literal
 
+from app.schemas.ratelimiting import (RateLimitConfig, RateLimitConfigDict,
+                                      RoleBasedLimits)
 from dotenv import load_dotenv
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
-
-from app.schemas.ratelimiting import RateLimitConfigDict, RoleBasedLimits, RateLimitConfig
 
 DOTENV_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 load_dotenv(DOTENV_PATH)

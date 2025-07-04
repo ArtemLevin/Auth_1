@@ -3,14 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-
 from app.core.dependencies import get_current_user, require_permission, rate_limit_dependency, http_bearer
+from uuid import UUID
+import structlog
+from app.core.dependencies import (get_current_user, rate_limit_dependency,
+                                   require_permission)
 from app.db.session import get_db_session
+from app.models.user import User
+from app.schemas.error import ErrorResponseModel
+from app.schemas.permission import UserPermissionsResponse
 from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.services.role_service import RoleService
-from app.models.user import User
-from app.schemas.permission import UserPermissionsResponse
-from app.schemas.error import ErrorResponseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 

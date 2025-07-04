@@ -1,9 +1,11 @@
-import pytest
-import httpx
-import pytest_asyncio
-from fastapi import status
 import logging
 from datetime import datetime
+
+import httpx
+import pytest
+import pytest_asyncio
+from fastapi import status
+
 # Базовый URL вашего сервера
 BASE_URL = "http://localhost:8000/api/v1/auth"  # Измените, если ваш сервер работает на другом порту
 

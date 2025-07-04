@@ -57,6 +57,7 @@ services:
       retries: 5
     restart: unless-stopped
 
+
   nginx:
     image: nginx:latest
     container_name: nginx
@@ -67,6 +68,15 @@ services:
       - "80:80"
     depends_on:
       - auth-service
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
 
 volumes:
   postgres_data:

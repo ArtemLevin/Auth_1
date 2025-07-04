@@ -1,9 +1,13 @@
-import click
 import asyncio
 from sqlalchemy.future import select
 from app.db.session import AsyncDBSession
+import click
 from app.core.security import get_password_hash
+from app.db.session import AsyncDBSession
 from app.models import User
+from app.services.auth_service import AuthService
+from sqlalchemy.future import select
+
 
 @click.group()
 def cli():

@@ -3,18 +3,18 @@ import os
 import sys
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
-from alembic import context
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 current_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(current_dir, ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app.settings import settings
 from app.models.base import Base
+from app.settings import settings
 
 config = context.config
 fileConfig(config.config_file_name)

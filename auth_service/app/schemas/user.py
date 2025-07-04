@@ -1,8 +1,9 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Annotated
-from annotated_types import MaxLen, MinLen
 from uuid import UUID
+
+from annotated_types import MaxLen, MinLen
+from pydantic import BaseModel, ConfigDict
 
 
 class UserBase(BaseModel):

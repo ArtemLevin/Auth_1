@@ -1,21 +1,26 @@
 from uuid import UUID
 from pathlib import Path
-
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
-
+import structlog
+from app.core.dependencies import get_current_user, rate_limit_dependency
 from app.db.session import get_db_session
-from app.schemas import LoginRequest, TokenPair, RegisterRequest, LoginHistoryResponse
-from app.services.auth_service import AuthService
-from app.schemas.error import ErrorResponseModel
+from app.schemas import (LoginHistoryResponse, LoginRequest, RegisterRequest,
+                         TokenPair)
 from app.schemas.auth import MessageResponse, RefreshToken
 from app.schemas.user import UserResponse
 from app.core.dependencies import get_current_user, rate_limit_dependency
 from app.core.oauth import oauth, OAuthProvider
 from authlib.integrations.starlette_client import OAuthError
+from app.schemas.error import ErrorResponseModel
+from app.services.auth_service import AuthService
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import Response
+
 
 logger = structlog.get_logger(__name__)
 
@@ -153,7 +158,7 @@ async def login(
 async def register(
     request_data: RegisterRequest, auth_service: AuthService = Depends(get_auth_service)
 ) -> Response:
-    success, error_messages = await auth_service.register(
+    success, error_messages, user = await auth_service.register(
         request_data.login, request_data.password, request_data.email
     )
 

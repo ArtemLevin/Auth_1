@@ -1,7 +1,6 @@
-from redis import asyncio as aioredis
 import structlog
-
 from app.settings import settings
+from redis import asyncio as aioredis
 
 logger = structlog.get_logger(__name__)
 

@@ -1,8 +1,9 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import List, Optional, Annotated
-from annotated_types import MaxLen
 from datetime import datetime
+from typing import Annotated, List, Optional
 from uuid import UUID
+
+from annotated_types import MaxLen
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RoleBase(BaseModel):

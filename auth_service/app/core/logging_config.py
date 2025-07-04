@@ -1,9 +1,8 @@
 import logging
 
 import structlog
-from colorlog import ColoredFormatter
-
 from app.settings import settings
+from colorlog import ColoredFormatter
 
 
 def setup_logging():
