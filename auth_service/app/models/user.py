@@ -7,7 +7,7 @@ from typing import List
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from auth_service.app.models.base import Base
+from app.models.base import Base
 
 
 class User(Base):
@@ -25,11 +25,10 @@ class User(Base):
         DateTime(timezone=True), onupdate=func.now()
     )
 
-<<<<<<< HEAD
-    roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user")
-    history: Mapped[List["LoginHistory"]] = relationship("LoginHistory", back_populates="user")
-=======
     roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     history: Mapped[List["LoginHistory"]] = relationship(
-        "LoginHistory", back_populates="user", cascade="all, delete-orphan")
->>>>>>> main
+        "LoginHistory", back_populates="user", cascade="all, delete-orphan"
+    )
+    social_accounts: Mapped[list["UserSocialAccount"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )

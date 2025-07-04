@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from app.core.dependencies import get_current_user, require_permission, rate_limit_dependency
+from app.core.dependencies import get_current_user, require_permission, rate_limit_dependency, http_bearer
 from app.db.session import get_db_session
 from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.services.role_service import RoleService
@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/roles", tags=["Roles"], dependencies=[Depends(http_bearer)])
 
 
-async def get_role_service(db: AsyncSession = Depends(db_helper.get_db_session)) -> RoleService:
+async def get_role_service(db: AsyncSession = Depends(get_db_session)) -> RoleService:
     return RoleService(db)
 
 
@@ -32,7 +32,9 @@ async def get_role_service(db: AsyncSession = Depends(db_helper.get_db_session))
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), #Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def create_role(
     role_data: RoleCreate,
@@ -58,7 +60,10 @@ async def create_role(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(get_current_user), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(get_current_user), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def get_all_roles(
     role_service: RoleService = Depends(get_role_service),
@@ -78,7 +83,10 @@ async def get_all_roles(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(get_current_user), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(get_current_user), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def get_role_by_id(
     role_id: UUID,
@@ -105,7 +113,10 @@ async def get_role_by_id(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default")) 
+    ]
 )
 async def update_role(
     role_id: UUID,
@@ -132,7 +143,10 @@ async def update_role(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def delete_role(
     role_id: UUID,
@@ -159,7 +173,10 @@ async def delete_role(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def assign_role_to_user(
     role_id: UUID,
@@ -189,7 +206,10 @@ async def assign_role_to_user(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def revoke_role_from_user(
     role_id: UUID,
@@ -221,7 +241,10 @@ async def revoke_role_from_user(
             "model": ErrorResponseModel,
         },
     },
-    dependencies=[Depends(require_permission("manage_roles")), Depends(lambda: rate_limit_dependency(traffic_type="default"))]
+    dependencies=[
+        Depends(require_permission("manage_roles")), 
+        # Depends(lambda: rate_limit_dependency(traffic_type="default"))
+    ]
 )
 async def get_user_permissions_endpoint(
     user_id: UUID,

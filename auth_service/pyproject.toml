@@ -21,10 +21,14 @@ dependencies = [
     "uvicorn>=0.34.3",
     "pytest-asyncio>=1.0.0",
     "httpx>=0.28.1",
+    "alembic>=1.16.2",
+    "authlib>=1.6.0",
+    "itsdangerous>=2.2.0",
+    "pytest-cov>=6.2.1",
 ]
 
 [tool.hatch.build]
-targets.wheel.packages = ["auth_service"]
+targets.wheel.packages = ["app"]
 
 [build-system]
 requires = ["hatchling"]

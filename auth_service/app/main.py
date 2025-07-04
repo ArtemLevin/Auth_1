@@ -2,31 +2,25 @@ import structlog
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.v1.routes import auth, roles
 from app.settings import settings
 from app.utils.cache import redis_client, test_connection
 from app.core.logging_config import setup_logging
-from app.schemas.error import ErrorResponseModel
 from app.utils.rate_limiter import RedisLeakyBucketRateLimiter
 
 logger = structlog.get_logger(__name__)
-
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("Приложение запускается...")
-    logger.info("Создание моделей базы данных...")
-    async with db_helper.engine.begin() as conn: 
-        await conn.run_sync(Base.metadata.create_all)
     await test_connection()
     app.state.rate_limiter = RedisLeakyBucketRateLimiter(redis_client, settings)
     yield
-    
     logger.info("Приложение завершает работу...")
-    await db_helper.dispose()
     await redis_client.close()
 
 
@@ -49,6 +43,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(SessionMiddleware, secret_key=settings.social_auth_secret_key)
+
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
@@ -56,6 +52,7 @@ async def health_check():
 
 
 app.include_router(auth.router, prefix=settings.api_v1_str)
+# app.include_router(social_auth.router, prefix=settings.api_v1_str)
 app.include_router(roles.router, prefix=settings.api_v1_str)
 
 async def get_rate_limiter(request: Request) -> RedisLeakyBucketRateLimiter:

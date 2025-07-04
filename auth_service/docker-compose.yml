@@ -4,8 +4,8 @@ services:
   auth-service:
     build: .
     container_name: auth-service
-    ports:
-      - "${FASTAPI_PORT}:${FASTAPI_PORT}"
+    # ports:
+      # - "${FASTAPI_PORT}:${FASTAPI_PORT}"
     env_file:
       - .env
     healthcheck:
@@ -22,7 +22,7 @@ services:
     volumes:
       - ./alembic:/app/alembic
 
-  postgres:
+  db:
     image: postgres:15.4
     container_name: postgres
     ports:
@@ -47,6 +47,7 @@ services:
     container_name: auth-redis
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
+      - "8001:8001"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -55,6 +56,17 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
 
 volumes:
   postgres_data:

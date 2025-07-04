@@ -1,6 +1,7 @@
+import os
 from typing import List, Literal
-from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
@@ -15,6 +16,17 @@ class Settings(BaseSettings):
     app_name: str = "Auth Service"
     debug: bool = False
     api_v1_str: str = "/api/v1"
+
+    # ключи авторизации
+    social_auth_secret_key: str = Field(None, description="Secret key")
+    yandex_client_id: str = Field(None, description="Yandex client Id")
+    yandex_client_secret: str = Field(None, description="Yandex client Secret")
+
+    vk_client_id: str = Field(None, description="VK client Id")
+    vk_client_secret: str = Field(None, description="VK client Secret")
+
+    google_client_id: str = Field(None, description="Google client Id")
+    google_client_secret: str = Field(None, description="Google client Secret")
 
     database_url: str = Field(..., description="PostgreSQL async URL")
     test_database_url: str = Field(..., description="PostgreSQL async URL for tests")
