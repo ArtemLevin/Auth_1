@@ -84,7 +84,7 @@ async def login(
 async def register(
     request_data: RegisterRequest, auth_service: AuthService = Depends(get_auth_service)
 ) -> Response:
-    success, error_messages = await auth_service.register(
+    success, error_messages, user = await auth_service.register(
         request_data.login, request_data.password, request_data.email
     )
 
