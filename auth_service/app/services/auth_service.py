@@ -1,4 +1,6 @@
 import datetime
+import json
+from typing import Literal
 from uuid import UUID
 
 import structlog
@@ -13,6 +15,8 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlalchemy import desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from app.utils.password_generator import generate_password
 
 logger = structlog.get_logger(__name__)
 
@@ -56,9 +60,10 @@ class AuthService:
 
     async def register(
         self, login: str, password: str, email: str | None = None
-    ) -> tuple[bool, dict[str, str]]:
+    ) -> tuple[bool, dict[str, str], User | None]:
         success = True
         errors: dict[str, str] = {}
+        user = None
 
         query_conditions = [User.login == login]
         if email:
@@ -96,7 +101,7 @@ class AuthService:
                 login=user.login,
             )
 
-        return success, errors
+        return success, errors, user
 
     async def update_profile(
         self,
@@ -219,3 +224,57 @@ class AuthService:
             user_id=user_id,
             current_jti=current_jti,
         )
+
+    async def handle_social_login(
+            self, provider: Literal["yandex", "vk", "google"],
+            user_info: dict
+    ) -> tuple[UUID, str]:
+
+        match provider:
+            case "yandex":
+                social_id = user_info["yandex_id"]
+                provider_db_column = User.yandex_id
+            case "vk":
+                social_id = user_info["vk_id"]
+                provider_db_column = User.vk_id
+            case "google":
+                social_id = user_info["google_id"]
+                provider_db_column = User.google_id
+            case _:
+                logger.warning(
+                    "Некорректный провайдер социальной авторизации",
+                    provider=provider
+                )
+                raise ValueError("Invalid social provider")
+
+        result = await self.db_session.execute(
+            select(User).where(provider_db_column == social_id))
+        user = result.scalars().first()
+
+        if user:
+            setattr(user, str(provider_db_column).split(".")[1], social_id)
+            logger.info("Вход через социальную сеть", login=user.login,
+                        provider=provider)
+            return user.id, user.login
+
+        email = user_info.get("email")
+        user_login = email if email else social_id
+
+        success, error_messages, user = await self.register(
+            login=user_login, password=generate_password(), email=email
+        )
+
+        if not success:
+            logger.warning(
+                "Ошибка при создании пользователя при социальной авторизации",
+                provider=provider, user_info=json.dumps(user_info)
+            )
+            raise ValueError("unsuccessful create user")
+
+        logger.info("Регистрация через социальную сеть", login=user.login, provider=provider)
+
+        setattr(user, str(provider_db_column).split(".")[1], social_id)
+        await self.db_session.commit()
+        await self.db_session.refresh(user)
+
+        return user.id, user.login

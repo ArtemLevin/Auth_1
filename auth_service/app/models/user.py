@@ -28,3 +28,10 @@ class User(Base):
     roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     history: Mapped[List["LoginHistory"]] = relationship(
         "LoginHistory", back_populates="user", cascade="all, delete-orphan")
+
+    yandex_id: Mapped[str | None] = mapped_column(String(255), unique=True,
+                                                  nullable=True)
+    vk_id: Mapped[str | None] = mapped_column(String(255), unique=True,
+                                              nullable=True)
+    google_id: Mapped[str | None] = mapped_column(String(255), unique=True,
+                                                  nullable=True)
